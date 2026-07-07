@@ -1,5 +1,9 @@
 # Codex CLI Mobile Pairing
 
+[English](#english) / [中文](#中文)
+
+## English
+
 Generate a short-lived pairing code for connecting ChatGPT mobile to a Codex CLI `app-server` host.
 
 This project is a small workaround for users who previously paired ChatGPT mobile with a Codex CLI remote-control host, but no longer see a first-class CLI pairing flow in the mobile app. It uses Codex's public, experimental `app-server` JSON-RPC methods:
@@ -9,8 +13,6 @@ This project is a small workaround for users who previously paired ChatGPT mobil
 - `remoteControl/pairing/status`
 
 The official supported setup path is still the Codex desktop app's "Set up Codex mobile" flow. This helper is intentionally narrow and experimental.
-
-English is the default documentation language. A Chinese version is available below: [中文说明](#中文说明).
 
 ## When This Helps
 
@@ -93,7 +95,7 @@ MIT
 
 ---
 
-# 中文说明
+## 中文
 
 为 Codex CLI `app-server` 主机生成一个短期有效的配对码，用于在 ChatGPT 移动端连接这个 CLI 环境。
 
