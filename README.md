@@ -37,7 +37,7 @@ Prefer the official Codex desktop app flow when it is available and works for yo
 
 ## Usage
 
-Run it directly with npm:
+Recommended: run it directly with npm/npx:
 
 ```bash
 npx codex-cli-mobile-pairing
@@ -50,9 +50,11 @@ npm install -g codex-cli-mobile-pairing
 codex-cli-mobile-pair
 ```
 
-You can also clone the repo and run:
+Alternative: clone the GitHub repository and run the script locally:
 
 ```bash
+git clone https://github.com/mjzcng/codex-cli-mobile-pairing.git
+cd codex-cli-mobile-pairing
 node bin/codex-cli-mobile-pair.js
 ```
 
@@ -143,7 +145,7 @@ MIT
 
 ## 使用方法
 
-可以直接通过 npm 运行：
+推荐方式：直接通过 npm/npx 运行：
 
 ```bash
 npx codex-cli-mobile-pairing
@@ -156,9 +158,11 @@ npm install -g codex-cli-mobile-pairing
 codex-cli-mobile-pair
 ```
 
-你也可以克隆仓库后运行：
+备选方式：克隆 GitHub 仓库后在本地运行脚本：
 
 ```bash
+git clone https://github.com/mjzcng/codex-cli-mobile-pairing.git
+cd codex-cli-mobile-pairing
 node bin/codex-cli-mobile-pair.js
 ```
 
