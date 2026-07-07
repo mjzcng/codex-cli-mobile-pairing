@@ -1,5 +1,9 @@
 # Codex CLI Mobile Pairing
 
+[![npm version](https://img.shields.io/npm/v/codex-cli-mobile-pairing.svg)](https://www.npmjs.com/package/codex-cli-mobile-pairing)
+[![npm downloads](https://img.shields.io/npm/dm/codex-cli-mobile-pairing.svg)](https://www.npmjs.com/package/codex-cli-mobile-pairing)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 [English](#english) / [中文](#中文)
 
 ## English
@@ -33,7 +37,7 @@ Prefer the official Codex desktop app flow when it is available and works for yo
 
 ## Usage
 
-After npm publishing, run it directly with:
+Run it directly with npm:
 
 ```bash
 npx codex-cli-mobile-pairing
@@ -139,7 +143,7 @@ MIT
 
 ## 使用方法
 
-npm 发布后，可以直接运行：
+可以直接通过 npm 运行：
 
 ```bash
 npx codex-cli-mobile-pairing
