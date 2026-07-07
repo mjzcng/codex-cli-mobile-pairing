@@ -4,12 +4,32 @@
   "description": "Generate ChatGPT mobile pairing codes for Codex CLI app-server hosts using Codex's experimental remote-control API.",
   "license": "MIT",
   "type": "commonjs",
+  "homepage": "https://github.com/mjzcng/codex-cli-mobile-pairing#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mjzcng/codex-cli-mobile-pairing.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mjzcng/codex-cli-mobile-pairing/issues"
+  },
+  "keywords": [
+    "codex",
+    "openai",
+    "chatgpt",
+    "mobile",
+    "pairing",
+    "remote-control",
+    "cli"
+  ],
   "bin": {
     "codex-cli-mobile-pair": "./bin/codex-cli-mobile-pair.js"
   },
   "files": [
     "bin"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "optionalDependencies": {
     "qrcode": "^1.5.4"
   },
