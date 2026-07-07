@@ -22,7 +22,7 @@
     "cli"
   ],
   "bin": {
-    "codex-cli-mobile-pair": "./bin/codex-cli-mobile-pair.js"
+    "codex-cli-mobile-pair": "bin/codex-cli-mobile-pair.js"
   },
   "files": [
     "bin"
