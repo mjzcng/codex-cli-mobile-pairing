@@ -37,17 +37,19 @@ Prefer the official Codex desktop app flow when it is available and works for yo
 
 ## Usage
 
-Recommended: run it directly with npm/npx:
+Recommended: start the persistent background service with npm/npx:
 
 ```bash
-npx codex-cli-mobile-pairing
+npx codex-cli-mobile-pairing start
 ```
+
+This starts a background Codex app-server, prints a short-lived manual pairing code, and keeps the app-server running after your terminal command returns.
 
 Or install it globally:
 
 ```bash
 npm install -g codex-cli-mobile-pairing
-codex-cli-mobile-pair
+codex-cli-mobile-pair start
 ```
 
 Alternative: clone the GitHub repository and run the script locally:
@@ -55,46 +57,65 @@ Alternative: clone the GitHub repository and run the script locally:
 ```bash
 git clone https://github.com/mjzcng/codex-cli-mobile-pairing.git
 cd codex-cli-mobile-pairing
-node bin/codex-cli-mobile-pair.js
+node bin/codex-cli-mobile-pair.js start
 ```
 
-The script prints:
+Common commands:
+
+```bash
+# Start the persistent background service and print a pairing code.
+npx codex-cli-mobile-pairing start
+
+# Check whether the service is running.
+npx codex-cli-mobile-pairing status
+
+# Restart the service and print a new pairing code.
+npx codex-cli-mobile-pairing restart
+
+# Stop the background app-server.
+npx codex-cli-mobile-pairing stop
+
+# Print service logs.
+npx codex-cli-mobile-pairing logs
+
+# Advanced: run in the foreground instead of starting a background service.
+npx codex-cli-mobile-pairing pair
+```
+
+The `start` and `restart` commands print:
 
 - an environment ID;
 - an expiry time;
 - a manual pairing code;
 - the raw pairing payload used for QR generation.
 
-Keep the script running while you enter the manual pairing code in ChatGPT mobile. The script polls `remoteControl/pairing/status` and prints `Claimed by mobile app.` after the mobile app claims the code.
+Enter the manual pairing code in ChatGPT mobile before it expires. After the mobile app claims the code, keep the background service running so the remote connection stays online.
 
 ## Options
 
 ```bash
-node bin/codex-cli-mobile-pair.js --help
+npx codex-cli-mobile-pairing --help
 ```
 
 Useful examples:
 
 ```bash
-# Persist remote-control enablement instead of enabling it only for this process.
-node bin/codex-cli-mobile-pair.js --persist
+# Start with a specific Codex executable.
+npx codex-cli-mobile-pairing start --codex /path/to/codex
 
-# Use a specific Codex executable.
-node bin/codex-cli-mobile-pair.js --codex /path/to/codex
+# Print JSON in addition to the human output in foreground mode.
+npx codex-cli-mobile-pairing pair --json
 
-# Print JSON in addition to the human output.
-node bin/codex-cli-mobile-pair.js --json
-
-# Write a PNG QR code if the optional qrcode package is installed.
+# Write a PNG QR code if the optional qrcode package is installed locally.
 npm install
-node bin/codex-cli-mobile-pair.js --qr-file /tmp/codex-pair.png
+npx codex-cli-mobile-pairing start --qr-file /tmp/codex-pair.png
 ```
 
 ## Notes
 
 - Pairing codes are short-lived. Have the ChatGPT mobile pairing screen ready before running the command.
-- The script starts `codex app-server --stdio` and keeps it alive. If you stop it, the host may no longer be reachable unless another Codex app-server/daemon is running with remote control enabled.
-- `--persist` calls `remoteControl/enable` without `ephemeral: true`; the default is process-only enablement.
+- `start` and `restart` keep `codex app-server --stdio` alive in the background. If you stop the service, the host may no longer be reachable unless another Codex app-server/daemon is running with remote control enabled.
+- `pair` runs in the foreground and is mainly useful for debugging. In foreground mode, `--persist` calls `remoteControl/enable` without `ephemeral: true`; otherwise foreground mode uses process-only enablement.
 - Do not paste pairing codes into issues or logs. They are temporary credentials.
 
 ## Background
@@ -145,17 +166,19 @@ MIT
 
 ## 使用方法
 
-推荐方式：直接通过 npm/npx 运行：
+推荐方式：通过 npm/npx 启动后台常驻服务：
 
 ```bash
-npx codex-cli-mobile-pairing
+npx codex-cli-mobile-pairing start
 ```
+
+这个命令会启动一个后台 Codex app-server，打印短期有效的手动配对码，并在当前终端命令结束后继续保持 app-server 运行。
 
 也可以全局安装：
 
 ```bash
 npm install -g codex-cli-mobile-pairing
-codex-cli-mobile-pair
+codex-cli-mobile-pair start
 ```
 
 备选方式：克隆 GitHub 仓库后在本地运行脚本：
@@ -163,46 +186,65 @@ codex-cli-mobile-pair
 ```bash
 git clone https://github.com/mjzcng/codex-cli-mobile-pairing.git
 cd codex-cli-mobile-pairing
-node bin/codex-cli-mobile-pair.js
+node bin/codex-cli-mobile-pair.js start
 ```
 
-脚本会输出：
+常用命令：
+
+```bash
+# 启动后台常驻服务并打印配对码。
+npx codex-cli-mobile-pairing start
+
+# 查看服务是否正在运行。
+npx codex-cli-mobile-pairing status
+
+# 重启服务并打印新的配对码。
+npx codex-cli-mobile-pairing restart
+
+# 停止后台 app-server。
+npx codex-cli-mobile-pairing stop
+
+# 查看服务日志。
+npx codex-cli-mobile-pairing logs
+
+# 高级用法：前台运行，不启动后台服务。
+npx codex-cli-mobile-pairing pair
+```
+
+`start` 和 `restart` 会输出：
 
 - environment ID；
 - 过期时间；
 - 手动配对码；
 - 用于生成二维码的原始 pairing payload。
 
-在 ChatGPT 移动端输入手动配对码时，请保持脚本运行。脚本会轮询 `remoteControl/pairing/status`，当移动端领取配对码后会输出 `Claimed by mobile app.`。
+请在配对码过期前到 ChatGPT 移动端输入。移动端领取配对码后，请保持后台服务运行，这样远程连接才会持续在线。
 
 ## 参数
 
 ```bash
-node bin/codex-cli-mobile-pair.js --help
+npx codex-cli-mobile-pairing --help
 ```
 
 常用示例：
 
 ```bash
-# 持久化启用 remote-control，而不是只在当前进程内临时启用。
-node bin/codex-cli-mobile-pair.js --persist
+# 使用指定 Codex 可执行文件启动。
+npx codex-cli-mobile-pairing start --codex /path/to/codex
 
-# 指定 Codex 可执行文件路径。
-node bin/codex-cli-mobile-pair.js --codex /path/to/codex
+# 前台模式下除普通输出外，同时打印 JSON。
+npx codex-cli-mobile-pairing pair --json
 
-# 除普通输出外，同时打印 JSON。
-node bin/codex-cli-mobile-pair.js --json
-
-# 如果已安装可选的 qrcode 包，写出 PNG 二维码。
+# 如果本地已安装可选的 qrcode 包，写出 PNG 二维码。
 npm install
-node bin/codex-cli-mobile-pair.js --qr-file /tmp/codex-pair.png
+npx codex-cli-mobile-pairing start --qr-file /tmp/codex-pair.png
 ```
 
 ## 注意事项
 
 - 配对码有效期很短。运行命令前建议先打开 ChatGPT 移动端的配对码输入页面。
-- 脚本会启动并保持 `codex app-server --stdio` 存活。停止脚本后，除非另有 Codex app-server/daemon 已启用 remote control，否则这个主机可能不再可达。
-- `--persist` 会在调用 `remoteControl/enable` 时不传 `ephemeral: true`；默认行为是仅当前进程临时启用。
+- `start` 和 `restart` 会让 `codex app-server --stdio` 在后台保持存活。停止服务后，除非另有 Codex app-server/daemon 已启用 remote control，否则这个主机可能不再可达。
+- `pair` 是前台调试模式。前台模式下，`--persist` 会在调用 `remoteControl/enable` 时不传 `ephemeral: true`；否则前台模式默认只在当前进程内临时启用。
 - 不要把配对码粘贴到 issue 或日志中。它们是临时凭据。
 
 ## 背景

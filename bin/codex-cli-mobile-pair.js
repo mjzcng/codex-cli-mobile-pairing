@@ -3,21 +3,37 @@
 
 const { spawn, spawnSync } = require("child_process");
 const fs = require("fs");
+const os = require("os");
+const path = require("path");
 const readline = require("readline");
 
 const DEFAULT_POLL_INTERVAL_MS = 3000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 60000;
+const STARTUP_TIMEOUT_MS = 20000;
+const STATE_HOME =
+  process.env.CODEX_CLI_MOBILE_PAIRING_HOME ||
+  path.join(os.homedir(), ".codex-cli-mobile-pairing");
+const PID_FILE = path.join(STATE_HOME, "pairing.pid");
+const LOG_FILE = path.join(STATE_HOME, "pairing.log");
 
 function usage() {
-  return `Usage: codex-cli-mobile-pair [options]
+  return `Usage: codex-cli-mobile-pair <command> [options]
 
 Generate a short-lived manual pairing code for connecting ChatGPT mobile to a
 Codex CLI app-server host through Codex's experimental remote-control API.
 
+Commands:
+  codex-cli-mobile-pair start      Start a background app-server and print a pairing code
+  codex-cli-mobile-pair status     Show whether the background app-server is running
+  codex-cli-mobile-pair restart    Restart the background app-server and print a new pairing code
+  codex-cli-mobile-pair stop       Stop the background app-server
+  codex-cli-mobile-pair logs       Print the background app-server log
+  codex-cli-mobile-pair pair       Run in the foreground and print a pairing code
+
 Options:
   --codex <path>             Codex executable to run. Default: codex
-  --persist                  Persist remote-control enablement for this app-server client scope.
-                             Default: ephemeral enablement for the current process only.
+  --persist                  Persist remote-control enablement in foreground pair mode.
+                             Background start/restart always persist remote control.
   --poll-interval <ms>       Pairing status poll interval. Default: ${DEFAULT_POLL_INTERVAL_MS}
   --request-timeout <ms>     Per-request timeout. Default: ${DEFAULT_REQUEST_TIMEOUT_MS}
   --qr-file <path>           Write a PNG QR code when the optional qrcode package is installed.
@@ -26,14 +42,19 @@ Options:
   --help                     Show this help.
 
 Examples:
-  codex-cli-mobile-pair
-  codex-cli-mobile-pair --persist
-  codex-cli-mobile-pair --qr-file /tmp/codex-pair.png
+  codex-cli-mobile-pair start
+  codex-cli-mobile-pair status
+  codex-cli-mobile-pair restart
+  codex-cli-mobile-pair stop
+  codex-cli-mobile-pair pair --persist
 `;
 }
 
 function parseArgs(argv) {
+  const command =
+    argv[0] && !argv[0].startsWith("-") ? argv.shift() : "start";
   const options = {
+    command,
     codex: "codex",
     persist: false,
     pollIntervalMs: DEFAULT_POLL_INTERVAL_MS,
@@ -53,10 +74,7 @@ function parseArgs(argv) {
       return argv[index];
     };
 
-    if (arg === "--help" || arg === "-h") {
-      console.log(usage());
-      process.exit(0);
-    } else if (arg === "--codex") {
+    if (arg === "--codex") {
       options.codex = next();
     } else if (arg === "--persist") {
       options.persist = true;
@@ -87,6 +105,52 @@ function parseArgs(argv) {
 
 function formatTime(unixSeconds) {
   return new Date(unixSeconds * 1000).toLocaleString();
+}
+
+function ensureStateHome() {
+  fs.mkdirSync(STATE_HOME, { recursive: true });
+}
+
+function readPid() {
+  try {
+    const raw = fs.readFileSync(PID_FILE, "utf8").trim();
+    const pid = Number(raw);
+    return Number.isInteger(pid) && pid > 0 ? pid : null;
+  } catch {
+    return null;
+  }
+}
+
+function isProcessRunning(pid) {
+  if (!pid) {
+    return false;
+  }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function clearPid() {
+  try {
+    fs.unlinkSync(PID_FILE);
+  } catch {
+    // Already gone.
+  }
+}
+
+function currentDaemon() {
+  const pid = readPid();
+  if (!pid) {
+    return { pid: null, running: false };
+  }
+  const running = isProcessRunning(pid);
+  if (!running) {
+    clearPid();
+  }
+  return { pid, running };
 }
 
 function createRpcClient(options) {
@@ -188,8 +252,166 @@ async function writeQrFile(pairingCode, qrFile) {
   return fs.existsSync(qrFile);
 }
 
-async function main() {
-  const options = parseArgs(process.argv.slice(2));
+function printPairingFromText(text) {
+  const lines = text.split(/\r?\n/);
+  const keys = [
+    /^Environment ID:/,
+    /^Expires At:/,
+    /^Manual Pairing Code:/,
+    /^\s+[A-Z0-9]{4}-[A-Z0-9]{4}\s*$/,
+    /^Raw Pairing Code for QR:/,
+  ];
+  let emitted = false;
+  for (const line of lines) {
+    if (keys.some((pattern) => pattern.test(line))) {
+      console.log(line);
+      emitted = true;
+    }
+  }
+  return emitted;
+}
+
+async function waitForPairingOutput(startOffset = 0) {
+  const deadline = Date.now() + STARTUP_TIMEOUT_MS;
+  let lastSize = startOffset;
+  let captured = "";
+
+  while (Date.now() < deadline) {
+    if (fs.existsSync(LOG_FILE)) {
+      const stat = fs.statSync(LOG_FILE);
+      if (stat.size > lastSize) {
+        const fd = fs.openSync(LOG_FILE, "r");
+        const buffer = Buffer.alloc(stat.size - lastSize);
+        fs.readSync(fd, buffer, 0, buffer.length, lastSize);
+        fs.closeSync(fd);
+        lastSize = stat.size;
+        captured += buffer.toString("utf8");
+        if (/Manual Pairing Code:\s*\n\s+[A-Z0-9]{4}-[A-Z0-9]{4}/.test(captured)) {
+          return captured;
+        }
+        if (/codex app-server exited|timed out|error/i.test(captured)) {
+          throw new Error(`Daemon failed to start. See log: ${LOG_FILE}`);
+        }
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  throw new Error(`Timed out waiting for pairing code. See log: ${LOG_FILE}`);
+}
+
+async function startDaemon(options) {
+  ensureStateHome();
+  const existing = currentDaemon();
+  if (existing.running) {
+    console.log(`Already running. PID: ${existing.pid}`);
+    console.log(`Logs: ${LOG_FILE}`);
+    console.log("Use `codex-cli-mobile-pair restart` to generate a new pairing code.");
+    return;
+  }
+
+  const startOffset = fs.existsSync(LOG_FILE) ? fs.statSync(LOG_FILE).size : 0;
+  const out = fs.openSync(LOG_FILE, "a");
+  const err = fs.openSync(LOG_FILE, "a");
+  const childArgs = [
+    __filename,
+    "pair",
+    "--persist",
+    "--no-terminal-qr",
+    "--codex",
+    options.codex,
+    "--poll-interval",
+    String(options.pollIntervalMs),
+    "--request-timeout",
+    String(options.requestTimeoutMs),
+  ];
+  if (options.json) {
+    childArgs.push("--json");
+  }
+  if (options.qrFile) {
+    childArgs.push("--qr-file", options.qrFile);
+  }
+
+  const child = spawn(process.execPath, childArgs, {
+    detached: true,
+    stdio: ["ignore", out, err],
+    env: {
+      ...process.env,
+      CODEX_CLI_MOBILE_PAIRING_HOME: STATE_HOME,
+    },
+  });
+  fs.closeSync(out);
+  fs.closeSync(err);
+  fs.writeFileSync(PID_FILE, `${child.pid}\n`);
+  child.unref();
+
+  console.log("Codex CLI mobile pairing service started.");
+  console.log(`PID: ${child.pid}`);
+  console.log(`Logs: ${LOG_FILE}`);
+  console.log("");
+
+  const output = await waitForPairingOutput(startOffset);
+  printPairingFromText(output);
+  console.log("");
+  console.log("Keep the service running until ChatGPT mobile claims the code.");
+  console.log("Use `codex-cli-mobile-pair status` to check it later.");
+  console.log("Use `codex-cli-mobile-pair stop` to stop it.");
+}
+
+async function stopDaemon({ silent = false } = {}) {
+  const daemon = currentDaemon();
+  if (!daemon.running) {
+    if (!silent) {
+      console.log("Codex CLI mobile pairing service is not running.");
+    }
+    return false;
+  }
+
+  process.kill(daemon.pid, "SIGTERM");
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    if (!isProcessRunning(daemon.pid)) {
+      clearPid();
+      if (!silent) {
+        console.log(`Stopped Codex CLI mobile pairing service. PID: ${daemon.pid}`);
+      }
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+
+  try {
+    process.kill(daemon.pid, "SIGKILL");
+  } catch {
+    // Already stopped.
+  }
+  clearPid();
+  if (!silent) {
+    console.log(`Stopped Codex CLI mobile pairing service. PID: ${daemon.pid}`);
+  }
+  return true;
+}
+
+function statusDaemon() {
+  const daemon = currentDaemon();
+  if (daemon.running) {
+    console.log(`Codex CLI mobile pairing service is running. PID: ${daemon.pid}`);
+    console.log(`Logs: ${LOG_FILE}`);
+  } else {
+    console.log("Codex CLI mobile pairing service is not running.");
+  }
+}
+
+function printLogs() {
+  if (!fs.existsSync(LOG_FILE)) {
+    console.log("No log file found.");
+    console.log(`Expected log: ${LOG_FILE}`);
+    return;
+  }
+  process.stdout.write(fs.readFileSync(LOG_FILE, "utf8"));
+}
+
+async function runPair(options) {
   const client = createRpcClient(options);
   let pollTimer = null;
 
@@ -267,6 +489,32 @@ async function main() {
       console.error("Poll error:", error.message || error);
     }
   }, options.pollIntervalMs);
+}
+
+async function main() {
+  const rawArgs = process.argv.slice(2);
+  if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
+    console.log(usage());
+    return;
+  }
+
+  const options = parseArgs(rawArgs);
+  if (options.command === "start") {
+    await startDaemon(options);
+  } else if (options.command === "restart") {
+    await stopDaemon({ silent: true });
+    await startDaemon(options);
+  } else if (options.command === "status") {
+    statusDaemon();
+  } else if (options.command === "stop") {
+    await stopDaemon();
+  } else if (options.command === "logs") {
+    printLogs();
+  } else if (options.command === "pair") {
+    await runPair(options);
+  } else {
+    throw new Error(`Unknown command: ${options.command}`);
+  }
 }
 
 main().catch((error) => {

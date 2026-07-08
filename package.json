@@ -1,6 +1,6 @@
 {
   "name": "codex-cli-mobile-pairing",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Generate ChatGPT mobile pairing codes for Codex CLI app-server hosts using Codex's experimental remote-control API.",
   "license": "MIT",
   "type": "commonjs",
@@ -23,6 +23,9 @@
   ],
   "bin": {
     "codex-cli-mobile-pair": "bin/codex-cli-mobile-pair.js"
+  },
+  "scripts": {
+    "test": "node --test"
   },
   "files": [
     "bin"
