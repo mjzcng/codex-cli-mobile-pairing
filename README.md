@@ -6,53 +6,85 @@
 
 [English](#english) / [中文](#中文)
 
+> [!IMPORTANT]
+> Current Codex CLI releases include an official `codex remote-control` workflow. Use the official commands first. This package is now maintained as a legacy fallback and diagnostic helper.
+
 ## English
 
-Generate a short-lived pairing code for connecting ChatGPT mobile to a Codex CLI `app-server` host.
+This project generates short-lived pairing codes for connecting ChatGPT mobile to a Codex CLI `app-server` host.
 
-This project is a small workaround for users who previously paired ChatGPT mobile with a Codex CLI remote-control host, but no longer see a first-class CLI pairing flow in the mobile app. It uses Codex's public, experimental `app-server` JSON-RPC methods:
+Codex CLI now provides the same core workflow directly, backed by its managed app-server daemon. For new setups, this package is no longer required.
 
-- `remoteControl/enable`
-- `remoteControl/pairing/start`
-- `remoteControl/pairing/status`
+## Recommended: Official Codex CLI
 
-The official supported setup path is still the Codex desktop app's "Set up Codex mobile" flow. This helper is intentionally narrow and experimental.
+Install or update Codex, then use the built-in commands:
 
-## When This Helps
+```bash
+npm install -g @openai/codex@latest
 
-Use this if:
+# Start the managed app-server daemon with Remote Control enabled.
+codex remote-control start
 
-- you run Codex from the CLI;
-- ChatGPT mobile offers a manual pairing / authorization-code entry flow;
-- you want to expose the current machine as a Codex remote-control host without opening the Codex desktop pairing UI.
+# Print a short-lived manual pairing code.
+codex remote-control pair
 
-Prefer the official Codex desktop app flow when it is available and works for your setup.
+# Stop the managed daemon when it is no longer needed.
+codex remote-control stop
+```
 
-## Requirements
+Use JSON output for scripts:
 
-- Codex CLI installed and authenticated.
-- Node.js 18 or newer.
-- ChatGPT mobile with Codex access in the same account/workspace.
-- Optional: `qrencode` if you want a terminal QR code.
+```bash
+codex remote-control pair --json
+```
 
-## Usage
+The JSON response includes `pairingCode`, `manualPairingCode`, `environmentId`, and `expiresAt`.
 
-Recommended: start the persistent background service with npm/npx:
+## When This Legacy Helper Still Helps
+
+Use this package only when:
+
+- your installed Codex version does not provide `codex remote-control`;
+- the official daemon cannot take over because another Desktop or SSH app-server already owns the default control socket;
+- you need the helper's `status`, `restart`, `logs`, or optional terminal/PNG QR features;
+- you are testing the experimental app-server remote-control protocol directly.
+
+For normal use, prefer the official commands above or the Codex desktop app's **Set up Remote** flow.
+
+## Legacy Helper Usage
+
+Requirements:
+
+- Codex CLI installed and authenticated;
+- Node.js 18 or newer;
+- ChatGPT mobile with Codex access in the same account and workspace;
+- optional `qrencode` for a terminal QR code.
+
+Run without installing globally:
 
 ```bash
 npx codex-cli-mobile-pairing start
 ```
 
-This starts a background Codex app-server, prints a short-lived manual pairing code, and keeps the app-server running after your terminal command returns.
-
-Or install it globally:
+Or install globally:
 
 ```bash
 npm install -g codex-cli-mobile-pairing
 codex-cli-mobile-pair start
 ```
 
-Alternative: clone the GitHub repository and run the script locally:
+Common legacy commands:
+
+```bash
+npx codex-cli-mobile-pairing start
+npx codex-cli-mobile-pairing status
+npx codex-cli-mobile-pairing restart
+npx codex-cli-mobile-pairing stop
+npx codex-cli-mobile-pairing logs
+npx codex-cli-mobile-pairing pair
+```
+
+Alternative: clone the repository and run it locally:
 
 ```bash
 git clone https://github.com/mjzcng/codex-cli-mobile-pairing.git
@@ -60,74 +92,33 @@ cd codex-cli-mobile-pairing
 node bin/codex-cli-mobile-pair.js start
 ```
 
-Common commands:
+Useful options:
 
 ```bash
-# Start the persistent background service and print a pairing code.
-npx codex-cli-mobile-pairing start
-
-# Check whether the service is running.
-npx codex-cli-mobile-pairing status
-
-# Restart the service and print a new pairing code.
-npx codex-cli-mobile-pairing restart
-
-# Stop the background app-server.
-npx codex-cli-mobile-pairing stop
-
-# Print service logs.
-npx codex-cli-mobile-pairing logs
-
-# Advanced: run in the foreground instead of starting a background service.
-npx codex-cli-mobile-pairing pair
-```
-
-The `start` and `restart` commands print:
-
-- an environment ID;
-- an expiry time;
-- a manual pairing code;
-- the raw pairing payload used for QR generation.
-
-Enter the manual pairing code in ChatGPT mobile before it expires. After the mobile app claims the code, keep the background service running so the remote connection stays online.
-
-## Options
-
-```bash
-npx codex-cli-mobile-pairing --help
-```
-
-Useful examples:
-
-```bash
-# Start with a specific Codex executable.
+# Use a specific Codex executable.
 npx codex-cli-mobile-pairing start --codex /path/to/codex
 
-# Print JSON in addition to the human output in foreground mode.
+# Print JSON in foreground mode.
 npx codex-cli-mobile-pairing pair --json
 
-# Write a PNG QR code if the optional qrcode package is installed locally.
+# Write a PNG QR code when the optional qrcode package is installed.
 npm install
 npx codex-cli-mobile-pairing start --qr-file /tmp/codex-pair.png
 ```
 
 ## Notes
 
-- Pairing codes are short-lived. Have the ChatGPT mobile pairing screen ready before running the command.
-- `start` and `restart` keep `codex app-server --stdio` alive in the background. If you stop the service, the host may no longer be reachable unless another Codex app-server/daemon is running with remote control enabled.
-- `pair` runs in the foreground and is mainly useful for debugging. In foreground mode, `--persist` calls `remoteControl/enable` without `ephemeral: true`; otherwise foreground mode uses process-only enablement.
-- Do not paste pairing codes into issues or logs. They are temporary credentials.
-
-## Background
-
-Codex's app-server documentation describes the experimental remote-control API. `remoteControl/pairing/start` accepts `manualCode: true` and returns `pairingCode`, `manualPairingCode`, `environmentId`, and Unix-seconds `expiresAt`.
-
-The official mobile setup documentation currently describes the Codex desktop app as the main pairing entrypoint.
+- Pairing codes are short-lived credentials. Do not paste them into issues or logs.
+- The legacy `start` and `restart` commands keep a separate `codex app-server --stdio` process alive in the background.
+- Stopping that process can make the host unreachable unless another Codex app-server or daemon has Remote Control enabled.
+- Running the official daemon and this legacy helper at the same time may create multiple app-server instances. Prefer one owner for a normal setup.
+- The helper uses the experimental `remoteControl/enable`, `remoteControl/pairing/start`, and `remoteControl/pairing/status` JSON-RPC methods.
 
 ## References
 
+- [Official Codex CLI command reference](https://learn.chatgpt.com/docs/developer-commands?surface=cli#cli-codex-remote-control)
+- [Official Remote connections documentation](https://learn.chatgpt.com/docs/remote-connections)
 - [Codex app-server README](https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md)
-- [Codex remote connections docs](https://developers.openai.com/codex/remote-connections)
 
 ## License
 
@@ -137,51 +128,80 @@ MIT
 
 ## 中文
 
-为 Codex CLI `app-server` 主机生成一个短期有效的配对码，用于在 ChatGPT 移动端连接这个 CLI 环境。
+本项目用于生成短期有效的配对码，让 ChatGPT 移动端连接 Codex CLI `app-server` 主机。
 
-这个项目是一个小型 workaround，适合曾经用 ChatGPT mobile 连接过 Codex CLI remote-control 主机、但在新版移动端里找不到 CLI 配对入口的用户。它调用的是 Codex 公开但仍处于实验状态的 `app-server` JSON-RPC 方法：
+当前 Codex CLI 已经原生提供同样的核心流程，并使用官方管理的 app-server daemon。对于新环境，通常已经不需要安装这个 npm 包。
 
-- `remoteControl/enable`
-- `remoteControl/pairing/start`
-- `remoteControl/pairing/status`
+## 推荐方式：Codex 官方命令
 
-官方当前支持的主路径仍然是 Codex 桌面端里的 "Set up Codex mobile" 流程。这个工具只覆盖 CLI 主机手动配对这一件事，定位是临时且实验性的。
+安装或更新 Codex，然后使用内置命令：
 
-## 适用场景
+```bash
+npm install -g @openai/codex@latest
 
-适合以下情况：
+# 启动官方管理的 app-server daemon，并启用 Remote Control。
+codex remote-control start
 
-- 你主要通过 Codex CLI 使用 Codex；
-- ChatGPT 移动端提供了手动输入配对码 / 授权码的入口；
-- 你希望把当前机器暴露为 Codex remote-control 主机，但不想或不能打开 Codex 桌面端配对 UI。
+# 输出短期有效的手动配对码。
+codex remote-control pair
 
-如果官方 Codex 桌面端配对流程可用，优先使用官方流程。
+# 不再需要时停止官方 daemon。
+codex remote-control stop
+```
 
-## 环境要求
+脚本调用可以使用 JSON 输出：
 
-- 已安装并登录 Codex CLI。
-- Node.js 18 或更高版本。
-- ChatGPT mobile 中同一账号 / workspace 具备 Codex 访问权限。
-- 可选：安装 `qrencode` 后可在终端输出二维码。
+```bash
+codex remote-control pair --json
+```
 
-## 使用方法
+JSON 中包含 `pairingCode`、`manualPairingCode`、`environmentId` 和 `expiresAt`。
 
-推荐方式：通过 npm/npx 启动后台常驻服务：
+## 这个兼容工具仍然适用的场景
+
+仅建议在以下情况使用本工具：
+
+- 当前安装的 Codex 版本还没有 `codex remote-control`；
+- Codex Desktop 或 SSH 启动的 app-server 已占用默认 control socket，导致官方 daemon 无法接管；
+- 需要本工具额外提供的 `status`、`restart`、`logs` 或终端/PNG 二维码功能；
+- 需要直接测试实验性的 app-server remote-control 协议。
+
+正常使用时，请优先采用上面的官方命令，或者 Codex 桌面端的 **Set up Remote** 流程。
+
+## 兼容工具使用方法
+
+环境要求：
+
+- 已安装并登录 Codex CLI；
+- Node.js 18 或更高版本；
+- ChatGPT 移动端中的同一账号和 workspace 具备 Codex 访问权限；
+- 可选安装 `qrencode`，用于在终端显示二维码。
+
+通过 npx 直接运行：
 
 ```bash
 npx codex-cli-mobile-pairing start
 ```
 
-这个命令会启动一个后台 Codex app-server，打印短期有效的手动配对码，并在当前终端命令结束后继续保持 app-server 运行。
-
-也可以全局安装：
+或者全局安装：
 
 ```bash
 npm install -g codex-cli-mobile-pairing
 codex-cli-mobile-pair start
 ```
 
-备选方式：克隆 GitHub 仓库后在本地运行脚本：
+常用兼容命令：
+
+```bash
+npx codex-cli-mobile-pairing start
+npx codex-cli-mobile-pairing status
+npx codex-cli-mobile-pairing restart
+npx codex-cli-mobile-pairing stop
+npx codex-cli-mobile-pairing logs
+npx codex-cli-mobile-pairing pair
+```
+
+也可以克隆仓库后在本地运行：
 
 ```bash
 git clone https://github.com/mjzcng/codex-cli-mobile-pairing.git
@@ -189,74 +209,33 @@ cd codex-cli-mobile-pairing
 node bin/codex-cli-mobile-pair.js start
 ```
 
-常用命令：
+常用参数：
 
 ```bash
-# 启动后台常驻服务并打印配对码。
-npx codex-cli-mobile-pairing start
-
-# 查看服务是否正在运行。
-npx codex-cli-mobile-pairing status
-
-# 重启服务并打印新的配对码。
-npx codex-cli-mobile-pairing restart
-
-# 停止后台 app-server。
-npx codex-cli-mobile-pairing stop
-
-# 查看服务日志。
-npx codex-cli-mobile-pairing logs
-
-# 高级用法：前台运行，不启动后台服务。
-npx codex-cli-mobile-pairing pair
-```
-
-`start` 和 `restart` 会输出：
-
-- environment ID；
-- 过期时间；
-- 手动配对码；
-- 用于生成二维码的原始 pairing payload。
-
-请在配对码过期前到 ChatGPT 移动端输入。移动端领取配对码后，请保持后台服务运行，这样远程连接才会持续在线。
-
-## 参数
-
-```bash
-npx codex-cli-mobile-pairing --help
-```
-
-常用示例：
-
-```bash
-# 使用指定 Codex 可执行文件启动。
+# 使用指定的 Codex 可执行文件。
 npx codex-cli-mobile-pairing start --codex /path/to/codex
 
-# 前台模式下除普通输出外，同时打印 JSON。
+# 在前台模式输出 JSON。
 npx codex-cli-mobile-pairing pair --json
 
-# 如果本地已安装可选的 qrcode 包，写出 PNG 二维码。
+# 安装可选的 qrcode 包后输出 PNG 二维码。
 npm install
 npx codex-cli-mobile-pairing start --qr-file /tmp/codex-pair.png
 ```
 
 ## 注意事项
 
-- 配对码有效期很短。运行命令前建议先打开 ChatGPT 移动端的配对码输入页面。
-- `start` 和 `restart` 会让 `codex app-server --stdio` 在后台保持存活。停止服务后，除非另有 Codex app-server/daemon 已启用 remote control，否则这个主机可能不再可达。
-- `pair` 是前台调试模式。前台模式下，`--persist` 会在调用 `remoteControl/enable` 时不传 `ephemeral: true`；否则前台模式默认只在当前进程内临时启用。
-- 不要把配对码粘贴到 issue 或日志中。它们是临时凭据。
-
-## 背景
-
-Codex app-server 文档描述了实验性的 remote-control API。`remoteControl/pairing/start` 接受 `manualCode: true`，并返回 `pairingCode`、`manualPairingCode`、`environmentId` 和 Unix 秒级 `expiresAt`。
-
-官方移动端设置文档目前仍将 Codex 桌面端描述为主要配对入口。
+- 配对码是短期凭据，请勿粘贴到 issue 或日志中。
+- 兼容工具的 `start` 和 `restart` 会在后台保持一个独立的 `codex app-server --stdio` 进程。
+- 停止该进程后，除非另有 app-server 或 daemon 已启用 Remote Control，否则主机可能无法继续连接。
+- 同时运行官方 daemon 和本兼容工具可能产生多个 app-server 实例。正常使用时建议只保留一个服务管理方。
+- 本工具调用实验性的 `remoteControl/enable`、`remoteControl/pairing/start` 和 `remoteControl/pairing/status` JSON-RPC 方法。
 
 ## 参考链接
 
+- [Codex 官方 CLI 命令参考](https://learn.chatgpt.com/docs/developer-commands?surface=cli#cli-codex-remote-control)
+- [官方 Remote connections 文档](https://learn.chatgpt.com/docs/remote-connections)
 - [Codex app-server README](https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md)
-- [Codex remote connections docs](https://developers.openai.com/codex/remote-connections)
 
 ## 许可证
 
